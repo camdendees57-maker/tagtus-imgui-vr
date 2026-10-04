@@ -16,11 +16,13 @@ add_library(tagtusimgui SHARED
   src/sound.cpp
   src/input.cpp
   src/sl2.cpp
+  src/vk_overlay.cpp
   third_party/imgui/imgui.cpp
   third_party/imgui/imgui_draw.cpp
   third_party/imgui/imgui_tables.cpp
   third_party/imgui/imgui_widgets.cpp
   third_party/imgui/backends/imgui_impl_opengl3.cpp
+  third_party/imgui/backends/imgui_impl_vulkan.cpp
 )
 
 target_compile_definitions(tagtusimgui PRIVATE IMGUI_IMPL_OPENGL_ES3)
@@ -29,4 +31,4 @@ target_include_directories(tagtusimgui PRIVATE
   third_party/imgui
   third_party/imgui/backends
 )
-target_link_libraries(tagtusimgui PRIVATE android EGL GLESv3 log dl aaudio)
+target_link_libraries(tagtusimgui PRIVATE android EGL GLESv3 log dl aaudio vulkan)
