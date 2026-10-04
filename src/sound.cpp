@@ -28,7 +28,7 @@ static Clip make_clip(float freq, float ms, float decay) {
     return c;
 }
 
-void tagtus_audio_init() {
+extern "C" void tagtus_audio_init() {
     g_click = make_clip(980.f, 70.f, 28.f);
     g_thock = make_clip(196.f, 120.f, 16.f);
     g_boot = make_clip(660.f, 160.f, 10.f);
