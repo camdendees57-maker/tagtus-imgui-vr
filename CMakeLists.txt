@@ -15,6 +15,7 @@ add_library(tagtusimgui SHARED
   src/hook.cpp
   src/sound.cpp
   src/input.cpp
+  src/sl2.cpp
   third_party/imgui/imgui.cpp
   third_party/imgui/imgui_draw.cpp
   third_party/imgui/imgui_tables.cpp
