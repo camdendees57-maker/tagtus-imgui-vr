@@ -1,7 +1,6 @@
 #include "tagtus_api.h"
 #include "imgui.h"
 #include <cstdio>
-#include <vector>
 
 struct MenuState {
     bool open = true;
@@ -17,7 +16,6 @@ struct MenuState {
     float speed_mul = 2.4f;
     float fly_speed = 6.0f;
 };
-
 static MenuState g_menu;
 
 void tagtus_menu_poll_file() {
@@ -29,14 +27,21 @@ void tagtus_menu_poll_file() {
 }
 
 void tagtus_draw_menu() {
-    ImGui::SetNextWindowSize(ImVec2(420, 520), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(460, 560), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowBgAlpha(0.92f);
     if (!g_menu.open) return;
     if (!ImGui::Begin("TagtusVR", &g_menu.open, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
-    ImGui::Text("symbols: waiting on game");
+    ImGui::TextUnformatted(tagtus_status_line());
+    ImGui::Text("export table: 241 il2cpp_*  build b3f8dbd4");
+    ImGui::Separator();
+    int n = tagtus_assembly_count();
+    ImGui::Text("images %d", n);
+    for (int i = 0; i < n; ++i)
+        ImGui::BulletText("%s", tagtus_assembly_name(i));
+    if (n == 0) ImGui::TextDisabled("no images yet. lib not mapped, or domain still cold.");
     ImGui::Separator();
     ImGui::Checkbox("fly", &g_menu.fly);
     ImGui::Checkbox("speed", &g_menu.speed);

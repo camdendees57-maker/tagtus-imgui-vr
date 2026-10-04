@@ -1,6 +1,4 @@
 #pragma once
-// Fill these in src/symbols.cpp when the game symbols land.
-// Overlay calls them every frame. Return 0 if you got nothing yet.
 
 struct TagtusActor {
     float x, y, z;
@@ -27,3 +25,7 @@ struct TagtusToggles {
 
 int tagtus_collect(TagtusActor* out, int max);
 void tagtus_apply(const TagtusToggles* t);
+const char* tagtus_status_line();
+int tagtus_resolved_count();
+int tagtus_assembly_count();
+const char* tagtus_assembly_name(int index);
