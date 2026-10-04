@@ -20,7 +20,6 @@ jobs:
       - name: deps
         run: |
           git clone --depth 1 --branch v1.91.8 https://github.com/ocornut/imgui.git third_party/imgui
-          git clone --depth 1 https://github.com/jmpews/Dobby.git third_party/Dobby
 
       - name: build
         env:

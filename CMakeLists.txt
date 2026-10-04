@@ -5,19 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/imgui/imgui.cpp")
-  message(FATAL_ERROR "imgui missing. CI clones it. Local: git clone --depth 1 https://github.com/ocornut/imgui.git third_party/imgui")
+  message(FATAL_ERROR "imgui missing. CI clones it.")
 endif()
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/Dobby/CMakeLists.txt")
-  message(FATAL_ERROR "Dobby missing. CI clones it.")
-endif()
-
-set(DOBBY_GENERATE_SHARED OFF CACHE BOOL "" FORCE)
-add_subdirectory(third_party/Dobby)
 
 add_library(tagtusimgui SHARED
   src/overlay.cpp
   src/menu.cpp
   src/symbols.cpp
+  src/hook.cpp
   third_party/imgui/imgui.cpp
   third_party/imgui/imgui_draw.cpp
   third_party/imgui/imgui_tables.cpp
@@ -31,4 +26,4 @@ target_include_directories(tagtusimgui PRIVATE
   third_party/imgui
   third_party/imgui/backends
 )
-target_link_libraries(tagtusimgui PRIVATE dobby_static android EGL GLESv3 log dl)
+target_link_libraries(tagtusimgui PRIVATE android EGL GLESv3 log dl)

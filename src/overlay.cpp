@@ -7,12 +7,12 @@
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 #include <atomic>
-#include <cstdint>
-#include "dobby.h"
 
 #define TAG "TagtusVR"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+extern "C" int tagtus_hook(void* target, void* repl, void** orig);
 
 using eglSwapBuffers_t = EGLBoolean (*)(EGLDisplay, EGLSurface);
 static eglSwapBuffers_t o_swap = nullptr;
@@ -86,7 +86,7 @@ static void install() {
         LOGE("eglSwapBuffers missing");
         return;
     }
-    int rc = DobbyHook(sym, (void*)hk_swap, (void**)&o_swap);
+    int rc = tagtus_hook(sym, (void*)hk_swap, (void**)&o_swap);
     LOGI("hook rc=%d sym=%p", rc, sym);
     g_hooked.store(rc == 0);
 }
