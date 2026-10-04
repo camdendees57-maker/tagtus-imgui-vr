@@ -9,61 +9,25 @@
 #define TAG "TagtusVR"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 
-// File VAs from this libil2cpp.so (arm64, build-id b3f8dbd4a5b0672ab3c7fca64b9f0c01f1509997).
-// Website dumps skip this whole export set. 241 names. dlsym first, base+VA if the table is hidden.
-struct ApiSlot { const char* name; uintptr_t va; void* fn; };
-static ApiSlot g_api[] = {
-    {"il2cpp_init", 0x1f93a3c, nullptr},
-    {"il2cpp_init_utf16", 0x1f93a68, nullptr},
-    {"il2cpp_domain_get", 0x1f94098, nullptr},
-    {"il2cpp_domain_assembly_open", 0x1f9409c, nullptr},
-    {"il2cpp_domain_get_assemblies", 0x1f940a4, nullptr},
-    {"il2cpp_assembly_get_image", 0x1f93b68, nullptr},
-    {"il2cpp_image_get_name", 0x1f94774, nullptr},
-    {"il2cpp_image_get_class_count", 0x1f9476c, nullptr},
-    {"il2cpp_image_get_class", 0x1f94770, nullptr},
-    {"il2cpp_class_get_name", 0x1f93bcc, nullptr},
-    {"il2cpp_class_get_namespace", 0x1f93bd0, nullptr},
-    {"il2cpp_class_from_name", 0x1f93ba0, nullptr},
-    {"il2cpp_class_get_method_from_name", 0x1f93bc8, nullptr},
-    {"il2cpp_class_get_field_from_name", 0x1f93bc0, nullptr},
-    {"il2cpp_runtime_invoke", 0x1f944b8, nullptr},
-    {"il2cpp_field_static_get_value", 0x1f94278, nullptr},
-    {"il2cpp_field_static_set_value", 0x1f9427c, nullptr},
-    {"il2cpp_thread_attach", 0x1f945b8, nullptr},
-    {"il2cpp_string_new", 0x1f9456c, nullptr},
-    {"il2cpp_object_new", 0x1f94490, nullptr},
-};
-static constexpr int kApi = sizeof(g_api) / sizeof(g_api[0]);
+extern "C" int tagtus_hook(void* target, void* repl, void** orig);
 
-using domain_get_t = void* (*)();
-using domain_asms_t = void** (*)(void* domain, size_t* size);
-using asm_image_t = void* (*)(void* assembly);
-using image_name_t = const char* (*)(void* image);
-using thread_attach_t = void* (*)(void* domain);
+static void* (*o_invoke)(void*, void*, void**, void**) = nullptr;
+static const char* (*o_method_name)(void*) = nullptr;
 
-static void* g_il2 = nullptr;
-static int g_resolved = 0;
-static bool g_ready = false;
+static bool g_fly = false, g_speed = false, g_god = false, g_ammo = false, g_norecoil = false;
+static char g_filter[64] = "Player";
+static char g_last[96] = "invoke: idle";
+static int g_hits = 0;
 static std::mutex g_lock;
-static char g_status[160] = "il2cpp: not resolved";
-static char g_images[24][64];
-static int g_image_n = 0;
+static bool g_hooked = false;
 
-static void* slot(const char* name) {
-    for (int i = 0; i < kApi; ++i)
-        if (strcmp(g_api[i].name, name) == 0) return g_api[i].fn;
-    return nullptr;
-}
-
-static uintptr_t module_base(const char* needle) {
+static uintptr_t module_base() {
     FILE* f = fopen("/proc/self/maps", "r");
     if (!f) return 0;
     char line[512];
     uintptr_t base = 0;
     while (fgets(line, sizeof(line), f)) {
-        if (!strstr(line, needle)) continue;
-        if (!strstr(line, "r-xp") && !strstr(line, "r--p")) continue;
+        if (!strstr(line, "libil2cpp.so")) continue;
         base = strtoull(line, nullptr, 16);
         break;
     }
@@ -71,62 +35,65 @@ static uintptr_t module_base(const char* needle) {
     return base;
 }
 
-static void resolve_locked() {
-    if (g_ready) return;
-    g_il2 = dlopen("libil2cpp.so", RTLD_NOLOAD);
-    if (!g_il2) g_il2 = dlopen("libil2cpp.so", RTLD_NOW);
-    uintptr_t base = module_base("libil2cpp.so");
-    g_resolved = 0;
-    for (int i = 0; i < kApi; ++i) {
-        void* fn = g_il2 ? dlsym(g_il2, g_api[i].name) : nullptr;
-        if (!fn) fn = dlsym(RTLD_DEFAULT, g_api[i].name);
-        if (!fn && base) fn = (void*)(base + g_api[i].va);
-        g_api[i].fn = fn;
-        if (fn) g_resolved++;
+static void* resolve(const char* name, uintptr_t va) {
+    void* h = dlopen("libil2cpp.so", RTLD_NOLOAD);
+    if (!h) h = dlopen("libil2cpp.so", RTLD_NOW);
+    void* fn = h ? dlsym(h, name) : nullptr;
+    if (!fn) fn = dlsym(RTLD_DEFAULT, name);
+    if (!fn) {
+        uintptr_t b = module_base();
+        if (b) fn = (void*)(b + va);
     }
-    auto domain_get = (domain_get_t)slot("il2cpp_domain_get");
-    auto get_asms = (domain_asms_t)slot("il2cpp_domain_get_assemblies");
-    auto get_image = (asm_image_t)slot("il2cpp_assembly_get_image");
-    auto get_name = (image_name_t)slot("il2cpp_image_get_name");
-    auto attach = (thread_attach_t)slot("il2cpp_thread_attach");
-    void* domain = domain_get ? domain_get() : nullptr;
-    if (domain && attach) attach(domain);
-    g_image_n = 0;
-    size_t n = 0;
-    void** asms = (domain && get_asms) ? get_asms(domain, &n) : nullptr;
-    if (asms) {
-        for (size_t i = 0; i < n && g_image_n < 24; ++i) {
-            void* img = get_image ? get_image(asms[i]) : nullptr;
-            const char* name = (img && get_name) ? get_name(img) : "?";
-            snprintf(g_images[g_image_n], 64, "%s", name ? name : "?");
-            g_image_n++;
+    return fn;
+}
+
+static void* hk_invoke(void* method, void* obj, void** params, void** exc) {
+    const char* name = (o_method_name && method) ? o_method_name(method) : nullptr;
+    if (name && name[0]) {
+        bool want = false;
+        {
+            std::lock_guard<std::mutex> lk(g_lock);
+            want = g_fly || g_speed || g_god || g_ammo || g_norecoil;
+            if (want && strstr(name, g_filter)) {
+                g_hits++;
+                snprintf(g_last, sizeof(g_last), "hit %s  #%d", name, g_hits);
+            }
         }
     }
-    snprintf(g_status, sizeof(g_status), "il2cpp %d/%d  domain=%p  images=%d  base=%p",
-             g_resolved, kApi, domain, g_image_n, (void*)base);
-    LOGI("%s", g_status);
-    g_ready = g_resolved > 0;
+    return o_invoke(method, obj, params, exc);
 }
 
-int tagtus_collect(TagtusActor* out, int max) {
-    (void)out; (void)max;
-    return 0;
+static void install_invoke() {
+    if (g_hooked) return;
+    void* invoke = resolve("il2cpp_runtime_invoke", 0x1f944bc);
+    void* mname = resolve("il2cpp_method_get_name", 0x1f943dc);
+    if (!invoke || !mname) {
+        snprintf(g_last, sizeof(g_last), "invoke hook waiting");
+        return;
+    }
+    o_method_name = (const char* (*)(void*))mname;
+    int rc = tagtus_hook(invoke, (void*)hk_invoke, (void**)&o_invoke);
+    g_hooked = rc == 0 && o_invoke;
+    snprintf(g_last, sizeof(g_last), g_hooked ? "invoke hooked" : "invoke hook failed %d", rc);
+    LOGI("%s invoke=%p", g_last, invoke);
 }
+
+int tagtus_collect(TagtusActor*, int) { return 0; }
 
 void tagtus_apply(const TagtusToggles* t) {
-    (void)t;
     std::lock_guard<std::mutex> lk(g_lock);
-    resolve_locked();
+    if (!t) return;
+    g_fly = t->fly; g_speed = t->speed; g_god = t->god;
+    g_ammo = t->inf_ammo; g_norecoil = t->no_recoil;
+    install_invoke();
 }
 
-const char* tagtus_status_line() {
+const char* tagtus_status_line() { return g_last; }
+int tagtus_resolved_count() { return g_hooked ? 1 : 0; }
+int tagtus_assembly_count() { return 0; }
+const char* tagtus_assembly_name(int) { return ""; }
+void tagtus_set_filter(const char* s) {
     std::lock_guard<std::mutex> lk(g_lock);
-    resolve_locked();
-    return g_status;
+    snprintf(g_filter, sizeof(g_filter), "%s", s ? s : "");
 }
-int tagtus_resolved_count() { return g_resolved; }
-int tagtus_assembly_count() { return g_image_n; }
-const char* tagtus_assembly_name(int index) {
-    if (index < 0 || index >= g_image_n) return "";
-    return g_images[index];
-}
+const char* tagtus_filter() { return g_filter; }

@@ -26,6 +26,16 @@ struct TagtusToggles {
 int tagtus_collect(TagtusActor* out, int max);
 void tagtus_apply(const TagtusToggles* t);
 const char* tagtus_status_line();
-int tagtus_resolved_count();
-int tagtus_assembly_count();
-const char* tagtus_assembly_name(int index);
+void tagtus_set_filter(const char* s);
+const char* tagtus_filter();
+
+void tagtus_audio_init();
+void tagtus_click();
+void tagtus_thock();
+void tagtus_boot_sound();
+
+void tagtus_input_start();
+float tagtus_touch_x();
+float tagtus_touch_y();
+int tagtus_touch_down();
+int tagtus_consume_toggle();

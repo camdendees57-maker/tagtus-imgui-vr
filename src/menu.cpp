@@ -1,6 +1,7 @@
 #include "tagtus_api.h"
 #include "imgui.h"
 #include <cstdio>
+#include <cstring>
 
 struct MenuState {
     bool open = true;
@@ -10,11 +11,12 @@ struct MenuState {
     bool god = false;
     bool inf_ammo = false;
     bool no_recoil = false;
-    bool esp_box = true;
-    bool esp_name = true;
+    bool esp_box = false;
+    bool esp_name = false;
     bool esp_snap = false;
     float speed_mul = 2.4f;
     float fly_speed = 6.0f;
+    char filter[64] = "Player";
 };
 static MenuState g_menu;
 
@@ -26,35 +28,66 @@ void tagtus_menu_poll_file() {
     fclose(f);
 }
 
+void tagtus_menu_toggle() {
+    g_menu.open = !g_menu.open;
+    tagtus_thock();
+}
+
+bool tagtus_menu_open() { return g_menu.open; }
+
+static bool click_check(const char* label, bool* v) {
+    bool before = *v;
+    ImGui::Checkbox(label, v);
+    if (ImGui::IsItemClicked()) {
+        if (*v != before) tagtus_thock();
+        else tagtus_click();
+        return true;
+    }
+    return false;
+}
+
 void tagtus_draw_menu() {
-    ImGui::SetNextWindowSize(ImVec2(460, 560), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowBgAlpha(0.92f);
+    ImGui::SetNextWindowPos(ImVec2(24, 24), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.85f);
+    ImGui::Begin("tagtus_open", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+    if (ImGui::Button(g_menu.open ? "TAGTUS  CLOSE" : "TAGTUS  OPEN", ImVec2(220, 64))) {
+        g_menu.open = !g_menu.open;
+        tagtus_thock();
+    }
+    ImGui::End();
+
     if (!g_menu.open) return;
+    ImGui::SetNextWindowSize(ImVec2(460, 560), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(24, 110), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowBgAlpha(0.94f);
     if (!ImGui::Begin("TagtusVR", &g_menu.open, ImGuiWindowFlags_NoCollapse)) {
         ImGui::End();
         return;
     }
     ImGui::TextUnformatted(tagtus_status_line());
-    ImGui::Text("export table: 241 il2cpp_*  build b3f8dbd4");
+    ImGui::Text("vol up/down toggles. touch the gold button.");
     ImGui::Separator();
-    int n = tagtus_assembly_count();
-    ImGui::Text("images %d", n);
-    for (int i = 0; i < n; ++i)
-        ImGui::BulletText("%s", tagtus_assembly_name(i));
-    if (n == 0) ImGui::TextDisabled("no images yet. lib not mapped, or domain still cold.");
-    ImGui::Separator();
-    ImGui::Checkbox("fly", &g_menu.fly);
-    ImGui::Checkbox("speed", &g_menu.speed);
+    ImGui::InputText("symbol filter", g_menu.filter, sizeof(g_menu.filter));
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        tagtus_set_filter(g_menu.filter);
+        tagtus_click();
+    }
+    click_check("fly", &g_menu.fly);
+    click_check("speed", &g_menu.speed);
     ImGui::SliderFloat("speed mul", &g_menu.speed_mul, 1.0f, 8.0f, "%.2f");
+    if (ImGui::IsItemDeactivatedAfterEdit()) tagtus_click();
     ImGui::SliderFloat("fly speed", &g_menu.fly_speed, 1.0f, 20.0f, "%.1f");
-    ImGui::Checkbox("noclip", &g_menu.noclip);
-    ImGui::Checkbox("god", &g_menu.god);
-    ImGui::Checkbox("inf ammo", &g_menu.inf_ammo);
-    ImGui::Checkbox("no recoil", &g_menu.no_recoil);
+    if (ImGui::IsItemDeactivatedAfterEdit()) tagtus_click();
+    click_check("noclip", &g_menu.noclip);
+    click_check("god", &g_menu.god);
+    click_check("inf ammo", &g_menu.inf_ammo);
+    click_check("no recoil", &g_menu.no_recoil);
     ImGui::Separator();
-    ImGui::Checkbox("esp box", &g_menu.esp_box);
-    ImGui::Checkbox("esp name", &g_menu.esp_name);
-    ImGui::Checkbox("esp snap", &g_menu.esp_snap);
+    click_check("esp box", &g_menu.esp_box);
+    click_check("esp name", &g_menu.esp_name);
+    click_check("esp snap", &g_menu.esp_snap);
     ImGui::End();
 
     TagtusToggles t{};
@@ -63,6 +96,7 @@ void tagtus_draw_menu() {
     t.esp_box = g_menu.esp_box; t.esp_name = g_menu.esp_name; t.esp_snap = g_menu.esp_snap;
     t.speed_mul = g_menu.speed_mul; t.fly_speed = g_menu.fly_speed;
     tagtus_apply(&t);
+    tagtus_set_filter(g_menu.filter);
 }
 
 void tagtus_draw_esp() {
@@ -77,14 +111,13 @@ void tagtus_draw_esp() {
     for (int i = 0; i < n; ++i) {
         const TagtusActor& a = buf[i];
         if (!a.on_screen) continue;
-        ImU32 col = a.team ? IM_COL32(232, 185, 49, 220) : IM_COL32(255, 90, 31, 220);
+        ImU32 col = IM_COL32(232, 185, 49, 220);
         if (g_menu.esp_box) {
             float h = 70.0f * (8.0f / (a.dist + 8.0f));
             float w = h * 0.45f;
             dl->AddRect(ImVec2(a.sx - w, a.sy - h), ImVec2(a.sx + w, a.sy + h * 0.2f), col, 0.0f, 0, 2.0f);
         }
-        if (g_menu.esp_snap)
-            dl->AddLine(origin, ImVec2(a.sx, a.sy), col, 1.5f);
+        if (g_menu.esp_snap) dl->AddLine(origin, ImVec2(a.sx, a.sy), col, 1.5f);
         if (g_menu.esp_name) {
             char line[64];
             snprintf(line, sizeof(line), "%s  %.0fm", a.name, a.dist);
@@ -92,6 +125,3 @@ void tagtus_draw_esp() {
         }
     }
 }
-
-bool tagtus_menu_open() { return g_menu.open; }
-void tagtus_menu_set(bool v) { g_menu.open = v; }

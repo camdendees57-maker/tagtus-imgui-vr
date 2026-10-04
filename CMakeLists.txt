@@ -13,6 +13,8 @@ add_library(tagtusimgui SHARED
   src/menu.cpp
   src/symbols.cpp
   src/hook.cpp
+  src/sound.cpp
+  src/input.cpp
   third_party/imgui/imgui.cpp
   third_party/imgui/imgui_draw.cpp
   third_party/imgui/imgui_tables.cpp
@@ -26,4 +28,4 @@ target_include_directories(tagtusimgui PRIVATE
   third_party/imgui
   third_party/imgui/backends
 )
-target_link_libraries(tagtusimgui PRIVATE android EGL GLESv3 log dl)
+target_link_libraries(tagtusimgui PRIVATE android EGL GLESv3 log dl aaudio)
