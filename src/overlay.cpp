@@ -16,6 +16,10 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 extern "C" int tagtus_hook(void* target, void* repl, void** orig);
+void tagtus_menu_poll_file();
+void tagtus_menu_toggle();
+void tagtus_draw_menu();
+void tagtus_draw_esp();
 
 using swap_t = EGLBoolean (*)(EGLDisplay, EGLSurface);
 using swap_dmg_t = EGLBoolean (*)(EGLDisplay, EGLSurface, const EGLint*, EGLint);
@@ -74,8 +78,6 @@ static void pump_input(int w, int h) {
     io.AddMouseButtonEvent(0, tagtus_touch_down() != 0);
     if (tagtus_consume_toggle()) tagtus_menu_toggle();
 }
-
-void tagtus_menu_toggle();
 
 static void draw_frame(EGLDisplay dpy, EGLSurface surface) {
     uint64_t ms = now_ms();
