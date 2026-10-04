@@ -29,10 +29,12 @@ const char* tagtus_status_line();
 void tagtus_set_filter(const char* s);
 const char* tagtus_filter();
 
+extern "C" {
 void tagtus_audio_init();
 void tagtus_click();
 void tagtus_thock();
 void tagtus_boot_sound();
+}
 
 void tagtus_input_start();
 float tagtus_touch_x();
